@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_filters %}
+
+{% block content %}
+
+
+
+<div class="text-center">
+  <h1>{{ title }}</h1>
+</div>
+<div class="user-office-block my-3">
+  <div class="user-info">
+    <div class="user-name">{{ user.first_name }} {{ user.last_name }}</div>
+    <div class="user-office">{{ user.office.name }}</div>
+  </div>
+  <div class="office-balance">
+    <div class="balance">Баланс: <br><span class="digits">{{ balance }} ₽</span></div>
+  </div>
+</div>
+<div class="routes">
+  <div class="routes_list my-3">
+  {% for route in routes %}
+    <a href="{% url 'change_route' route.from_city.id route.to_city.id %}" type="button" class="btn btn-primary btn-sm {% if request.session.route.from_id == route.from_city.id and request.session.route.to_id == route.to_city.id %}active-route{% endif %}" id="{{ route.from_city.id }}to{{ route.to_city.id }}" >{{ route.name }}</a>
+  {% endfor %}
+  </div>
+</div>
+<div class="choice-way-block my-3">
+    <a href="{% url 'change_way' 'sent' %}" class="{% if way == 'sent' %}active-button{% else %}inactive-button{% endif %}" id="sent-button">Отправлено</a>
+    <a href="{% url 'change_way' 'received' %}" class="{% if way == 'received' %}active-button{% else %}inactive-button{% endif %}" id="received-button">Получено</a>
+</div>
+
+  <form id="search-form" method="GET" action="{% url 'index' %}">
+      {{ search_form|crispy }}
+      <button type="submit" class="btn btn-primary ms-3 mb-3">Поиск</button>
+  </form>
+  {% if way == 'sent' %}
+  <a type="button" class="btn btn-primary new-parcel-button" id="new-parcel-button" data-bs-toggle="modal" data-bs-target="#newParcelModal">Новая посылка</a>
+  <a href="{% url 'send_to_office' %}" type="button" class="btn btn-primary new-parcel-button" id="send-to-office-button">Отправить посылки</a>
+  {% elif way == 'received' %}
+  <a href="{% url 'receive_to_office' %}" type="button" class="btn btn-primary new-parcel-button" id="received-to-office-button">Получить посылки</a>
+  {% endif %}
+  {% if page_obj %}
+  <table class="table table-hover custom-table my-3">
+    <thead>
+      <tr>
+        <th scope="col">Дата оформления</th>
+        <th scope="col">ФИО</th>
+        <th scope="col">Телефон отправителя</th>
+        <th scope="col">Телефон получателя</th>
+        <th scope="col">Код</th>
+        <th scope="col">Плательщик</th>
+        <th scope="col">Статус посылки</th>
+        <th scope="col">Дата выдачи</th>
+        <th scope="col">Статус оплаты</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for parcel in page_obj %}
+      <tr>
+        <th>{{ parcel.created_at|date:'d.m.y H:i' }}</th>
+        <td>{{ parcel.to_customer.name }}</td>
+        <td>{{ parcel.from_customer.phone }}</td>
+        <td>{{ parcel.to_customer.phone }}</td>
+        <td>{{ parcel.code }}</td>
+        {% if parcel.payer.id == 3 %}
+        <td class="green">Отправитель</td>
+        {% else %}
+        <td class="red">Получатель</td>
+        {% endif %}
+        {% if parcel.ship_status.id == 2 %}
+        <td class="green">{{ parcel.ship_status.name }}</td>
+        {% elif parcel.ship_status.id == 4 %}
+        <td class="blue">{{ parcel.ship_status.name }}</td>
+        {% elif parcel.ship_status.id == 1 %}
+        <td class="red">{{ parcel.ship_status.name }}</td>
+        {% else %}
+        <td class="yellow">{{ parcel.ship_status.name }}</td>
+        {% endif %}
+        <td>
+          {% if parcel.ship_status.id == 2 %}
+          {{ parcel.complete_date|date:'d.m.y H:m' }}
+          {% elif parcel.ship_status.id == 1 and way == 'received' %}
+<!--          <a href="{% url 'deliver_parcel' parcel.id %}" type="button" class="btn btn-primary deliver-parcel-button btn-sm">Выдать</a>-->
+          <a type="button" class="btn btn-primary deliver-parcel-button btn-sm" id="deliver-parcel-button" data-object-id="{{ parcel.id }}" data-bs-toggle="modal" data-bs-target="#deliverParcelModal">Выдать</a>
+          {% endif %}
+        </td>
+        {% if parcel.payment_status %}
+        <td class="green">Оплачено</td>
+        {% else %}
+        <td class="red">Не оплачено</td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+    {% include 'inc/_pagination.html' %}
+  {% else %}
+  <div class="my-3">
+  <p>Посылок нет</p>
+  </div>
+  {% endif %}
+
+
+
+
+
+
+<!-- Modal -->
+<div class="modal fade" id="newParcelModal" tabindex="-1" aria-labelledby="newParcelModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="newParcelModalLabel">Новая посылка</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="new-parcel-form" method="post" action="{% url 'create_new_parcel' %}">
+          {% csrf_token %}
+          {{ new_parcel_form|crispy }}
+          <div class="price-buttons pb-3">
+            {% for price in price_buttons %}
+              <button type="button" class="btn btn-secondary btn-sm price-btn">{{ price }}</button>
+            {% endfor %}
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary btn-sm" name="action" value="send-button">Создать посылку</button>
+          <button type="submit" class="btn btn-primary btn-sm" name="action" value="send-print-button">Создать посылку и распечатать</button>
+          <input type="hidden" name="button-clicked" id="button-clicked" value="">
+
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+          <script>
+            const priceButtons = document.querySelectorAll('.price-buttons button')
+            priceButtons.forEach((btn) => {
+              btn.addEventListener('click', () => {
+                const currentActiveBtn = document.querySelector('.price-buttons button.active')
+                if (currentActiveBtn) {
+                  currentActiveBtn.classList.remove('active')
+                }
+                btn.classList.add('active')
+                const priceInput = document.querySelector('#id_price')
+                priceInput.value = btn.textContent
+              })
+            })
+          </script>
+          <script>
+          $( function() {
+            var availableTags = [
+                {% for customer in customers %}
+                    "{{ customer.id }} / {{ customer.name }} / {{ customer.phone }}",
+                {% endfor %}
+            ];
+            function handleCustomerSelection(selectedValue, phoneField) {
+                var customerPhone = selectedValue.split(" / ")[2];
+                $(phoneField).val(customerPhone);
+                $('#id_from_customer').blur()
+                $('#id_to_customer').blur()
+              }
+
+              // Применяем автозаполнение и обработчик для id_from_customer и id_from_customer_phone
+              $("#id_from_customer").autocomplete({
+                source: availableTags,
+                select: function(event, ui) {
+                  handleCustomerSelection(ui.item.value, "#id_from_customer_phone");
+                }
+              });
+
+              // Применяем автозаполнение и обработчик для id_to_customer и id_to_customer_phone
+              $("#id_to_customer").autocomplete({
+                source: availableTags,
+                select: function(event, ui) {
+                  handleCustomerSelection(ui.item.value, "#id_to_customer_phone");
+                }
+              });
+            });
+
+
+          </script>
+          <script>
+              const nameField = document.querySelector('#id_from_customer')
+              nameField.addEventListener('change', () => {
+                  console.log(nameField.value)
+              })
+          </script>
+          <script type="text/javascript">
+              $("#new-parcel-form button").on("click", function() {
+                  const buttonValue = $(this).attr("value");
+                  $("#button-clicked").val(buttonValue);
+              });
+
+
+              $('#new-parcel-form').submit(function(e){
+                  e.preventDefault();
+                  $('#new-parcel-form small').remove();
+                  $form = $(this)
+                  const formData = new FormData(this);
+
+                  $.ajax({
+                      url: '{% url "create_new_parcel" %}',
+                      type: 'POST',
+                      data: formData,
+                      success: function (response) {
+                          $('.error').remove();
+                          console.log(response)
+                          if(response.error){
+                              alert(response.message)
+                              $.each(response.errors, function(name, error){
+                                  error = '<small class="text-muted error">' + error + '</small>'
+                                  $form.find('[name=' + name + ']').after(error);
+                              })
+                          }
+                          else{
+                              alert(response.message)
+                              if (response.barcode) {
+                                const printWindow = window.open('', '_blank');
+                                // Вставляем HTML-контент в новое окно
+                                printWindow.document.open();
+                                printWindow.document.write(response.barcode);
+                                printWindow.print();
+                                // printWindow.document.close();
+
+                                // Ожидаем завершения загрузки ресурсов (например, изображений)
+                                printWindow.onload = function () {
+                                    // Запускаем процесс печати
+                                    printWindow.print();
+                                    // Закрываем новое окно после завершения печати (опционально)
+                                    printWindow.close();
+                                };
+                                // window.open(response.barcode, '_blank').print();
+                              }
+                              location.reload();
+
+                          }
+                      },
+                      cache: false,
+                      contentType: false,
+                      processData: false
+                  });
+              });
+              // end
+          </script>
+
+<!-- Modal -->
+<div class="modal fade" id="deliverParcelModal" tabindex="-1" aria-labelledby="deliverParcelModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="deliverParcelModalLabel">Выдать посылку</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-content">
+        </div>
+
+
+
+
+        <script>
+        $(document).ready(function() {
+          $(".deliver-parcel-button").click(function() {
+            const objectId = $(this).data("object-id");
+            $.ajax({
+              url: '/get_object_info/',
+              type: 'GET',
+              data: { object_id: objectId },
+              success: function(data) {
+                $('.modal-body').html(data.html_response);
+              }
+            });
+          });
+        });
+        </script>
+
+
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

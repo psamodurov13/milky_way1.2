@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_filters %}
+
+{% block content %}
+<div class="text-center">
+  <h1>{{ title }}</h1>
+</div>
+<div class="user-office-block my-3">
+  <div class="routes">
+    <div class="routes_list my-3">
+    {% for route in routes %}
+      <a href="{% url 'change_route' route.from_city.id route.to_city.id %}" type="button" class="btn btn-primary btn-sm {% if request.session.route.from_id == route.from_city.id and request.session.route.to_id == route.to_city.id %}active-route{% endif %}" id="{{ route.from_city.id }}to{{ route.to_city.id }}" >{{ route.name }}</a>
+    {% endfor %}
+    </div>
+  </div>
+  <div class="office-balance">
+    <div class="balance">Баланс: <br><span class="digits">{{ balance }} ₽</span></div>
+  </div>
+</div>
+
+
+  <form id="search-form" method="GET" action="{% url 'index' %}">
+    {{ search_form|crispy }}
+    <button type="submit" class="btn btn-primary ms-3 mb-3">Поиск</button>
+  </form>
+  {% if page_obj %}
+  <table class="table table-hover custom-table my-3">
+    <thead>
+      <tr>
+        <th scope="col">Дата оформления</th>
+        <th scope="col">ФИО</th>
+        <th scope="col">Телефон отправителя</th>
+        <th scope="col">Телефон получателя</th>
+        <th scope="col">Код</th>
+        <th scope="col">Плательщик</th>
+        <th scope="col">Статус посылки</th>
+        <th scope="col">Дата выдачи</th>
+        <th scope="col">Посылку оформил</th>
+        <th scope="col">Посылку выдал</th>
+        <th scope="col">Статус оплаты</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for parcel in page_obj %}
+      <tr>
+        <th>{{ parcel.created_at|date:'d.m.y H:i' }}</th>
+        <td>{{ parcel.to_customer.name }}</td>
+        <td>{{ parcel.from_customer.phone }}</td>
+        <td>{{ parcel.to_customer.phone }}</td>
+        <td>{{ parcel.code }}</td>
+        {% if parcel.payer.name == 'Отправитель' %}
+        <td class="green">Отправитель</td>
+        {% else %}
+        <td class="red">Получатель</td>
+        {% endif %}
+        {% if parcel.ship_status.id == 2 %}
+        <td class="green">{{ parcel.ship_status.name }}</td>
+        {% elif parcel.ship_status.id == 4 %}
+        <td class="blue">{{ parcel.ship_status.name }}</td>
+        {% elif parcel.ship_status.id == 1 %}
+        <td class="red">{{ parcel.ship_status.name }}</td>
+        {% else %}
+        <td class="yellow">{{ parcel.ship_status.name }}</td>
+        {% endif %}
+        <td>{{ parcel.complete_date|date:'d.m.y H:m' }}</td>
+        <td>{{ parcel.created_by.first_name }}</td>
+        <td>{{ parcel.delivered_by.first_name }}</td>
+        {% if parcel.payment_status %}
+        <td class="green">Оплачено</td>
+        {% else %}
+        <td class="red">Не оплачено</td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+    {% include 'inc/_pagination.html' %}
+  {% else %}
+  <p>Посылок нет</p>
+  {% endif %}
+
+
+
+{% endblock %}
